@@ -7,10 +7,10 @@ import Data.List (intersperse)
 import System.Exit (exitSuccess)
 import System.Random (randomRIO)
 
-type WordList = [String]
+--type WordList = [String]
+newtype WordList = WordList [String]
 
 data Puzzle = Puzzle String [Maybe Char] [Char]
-
 
 instance Show Puzzle where
   show (Puzzle _ discovered guessed) =
@@ -21,7 +21,7 @@ instance Show Puzzle where
 allWords :: IO WordList
 allWords = do
   dict <- readFile "data/dict.txt"
-  return (lines dict)
+  return $ WordList (lines dict)
 
 minWordLength :: Int
 minWordLength = 5
@@ -31,14 +31,14 @@ maxWordLength = 9
 
 gameWords :: IO WordList
 gameWords = do
-  aw <- allWords
-  return (filter gameLength aw)
+  (WordList aw) <- allWords
+  return $ WordList (filter gameLength aw)
   where gameLength w =
           let l = length (w :: String)
           in  l > minWordLength && l < maxWordLength
 
 randomWord :: WordList -> IO String
-randomWord wl = do
+randomWord (WordList wl) = do
   randomIndex <- randomRIO (0, (length wl) - 1 )
   return $ wl !! randomIndex
 
@@ -59,6 +59,7 @@ renderPuzzleChar :: Maybe Char -> Char
 renderPuzzleChar Nothing = '_'
 renderPuzzleChar (Just c) = c 
 
+
 fillInCharacter :: Puzzle -> Char -> Puzzle
 fillInCharacter (Puzzle word filledInSoFar guessed) c =
   Puzzle word newFilledInSoFar (c : guessed)
@@ -68,6 +69,8 @@ fillInCharacter (Puzzle word filledInSoFar guessed) c =
           else guessChar
         newFilledInSoFar =
           zipWith (zipper c) word filledInSoFar
+
+
 
 handleGuess :: Puzzle -> Char -> IO Puzzle
 handleGuess puzzle guess = do
@@ -86,14 +89,18 @@ handleGuess puzzle guess = do
       putStrLn "This character wasn't in\
                \ the word, try again."
       return (fillInCharacter puzzle guess)
-      
+
+
+{- only incorrect guesses count against you -}
+
 gameOver :: Puzzle -> IO ()
 gameOver (Puzzle wordToGuess _ guessed) =
-  if (length guessed) > 7 then
+  if (length incorrect) > 9 then
     do putStrLn "You Lose!"
        putStrLn $ "the word was: " ++ wordToGuess
        exitSuccess
     else return ()
+  where incorrect = map (flip elem wordToGuess) guessed 
 
 gameWin :: Puzzle -> IO ()
 gameWin (Puzzle _ filledInSoFar _) =
@@ -114,7 +121,7 @@ runGame puzzle = forever $ do
     [c] -> handleGuess puzzle c >>= runGame
     _   -> putStrLn "Your guess must\
                     \ be a signle character"
-
+           
 main :: IO ()
 main = do
   word <- randomWord'
